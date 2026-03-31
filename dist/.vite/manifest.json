@@ -1,6 +1,6 @@
 {
   "../../../@crx/manifest": {
-    "file": "assets/crx-manifest.js-CVhRxaPO.js",
+    "file": "assets/crx-manifest.js-BQNDFQtz.js",
     "name": "crx-manifest.js",
     "src": "../../../@crx/manifest",
     "isEntry": true
@@ -9,10 +9,10 @@
     "file": "assets/storage-Dc_xVt7z.js",
     "name": "storage"
   },
-  "src/background/index.ts": {
-    "file": "assets/index.ts-Bqg8qIBQ.js",
-    "name": "index.ts",
-    "src": "src/background/index.ts",
+  "src/background/service-worker.ts": {
+    "file": "assets/service-worker.ts-DZNiY9zZ.js",
+    "name": "service-worker.ts",
+    "src": "src/background/service-worker.ts",
     "isEntry": true,
     "imports": [
       "_storage-Dc_xVt7z.js"
