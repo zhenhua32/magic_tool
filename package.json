@@ -1,0 +1,23 @@
+{
+  "name": "magic_tool",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@vitejs/plugin-vue": "^6.0.5",
+    "vue": "^3.5.31"
+  },
+  "devDependencies": {
+    "@crxjs/vite-plugin": "^2.0.0-beta.33",
+    "typescript": "^6.0.2",
+    "vite": "^8.0.3"
+  }
+}
