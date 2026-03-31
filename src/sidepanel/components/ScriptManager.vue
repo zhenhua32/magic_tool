@@ -13,9 +13,13 @@
           <span class="meta">{{ script.urlPattern }} · {{ formatDate(script.updatedAt) }}</span>
         </div>
         <div class="script-actions">
-          <button class="action-btn run" @click="run(script)" title="执行">▶</button>
-          <button class="action-btn edit" @click="toggleEdit(script.id)" title="编辑">✏️</button>
-          <button class="action-btn delete" @click="remove(script.id)" title="删除">🗑️</button>
+          <button class="action-btn run" @click.stop="run(script)" title="执行">▶</button>
+          <button class="action-btn edit" @click.stop="toggleEdit(script.id)" title="编辑">✏️</button>
+          <button v-if="deletingId !== script.id" class="action-btn delete" @click.stop="deletingId = script.id" title="删除">🗑️</button>
+          <template v-else>
+            <button class="action-btn confirm-del" @click.stop="confirmDelete(script.id)">确认</button>
+            <button class="action-btn cancel-del" @click.stop="deletingId = ''">取消</button>
+          </template>
         </div>
       </div>
 
@@ -58,6 +62,7 @@ import { useScripts } from '../composables/useScripts'
 const { scripts, removeScript, updateScript, executeScript } = useScripts()
 
 const editingId = ref('')
+const deletingId = ref('')
 const editForm = reactive({ name: '', urlPattern: '', code: '' })
 const results = reactive<Record<string, { success: boolean; result?: string; error?: string }>>({})
 
@@ -84,9 +89,10 @@ async function saveEdit(id: string) {
   editingId.value = ''
 }
 
-async function remove(id: string) {
+async function confirmDelete(id: string) {
   await removeScript(id)
   delete results[id]
+  deletingId.value = ''
 }
 
 async function run(script: SavedScript) {
@@ -189,6 +195,19 @@ function formatDate(ts: number): string {
 .action-btn.delete:hover {
   background: #fce4ec;
   border-color: #ef9a9a;
+}
+
+.action-btn.confirm-del {
+  background: #e53935;
+  color: white;
+  border-color: #e53935;
+  font-size: 11px;
+}
+
+.action-btn.cancel-del {
+  background: #eee;
+  color: #555;
+  font-size: 11px;
 }
 
 .code-preview {

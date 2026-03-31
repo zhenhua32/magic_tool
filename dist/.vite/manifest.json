@@ -25,7 +25,7 @@
     "isEntry": true
   },
   "src/sidepanel/index.html": {
-    "file": "assets/sidepanel-DT0sGz8C.js",
+    "file": "assets/sidepanel-BDAsXBFy.js",
     "name": "sidepanel",
     "src": "src/sidepanel/index.html",
     "isEntry": true,
@@ -33,7 +33,7 @@
       "_storage-C9aF62qG.js"
     ],
     "css": [
-      "assets/sidepanel-CyR93i_R.css"
+      "assets/sidepanel--f8veGRH.css"
     ]
   }
 }

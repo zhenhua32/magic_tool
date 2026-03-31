@@ -1,13 +1,27 @@
-import { ref, onMounted } from 'vue'
+import { ref } from 'vue'
 import type { SavedScript } from '@/shared/types'
 import { getScripts, saveScripts, generateId } from '@/shared/storage'
 
-export function useScripts() {
-  const scripts = ref<SavedScript[]>([])
+// Singleton shared state
+const scripts = ref<SavedScript[]>([])
+let initialized = false
 
-  onMounted(async () => {
-    scripts.value = await getScripts()
-  })
+async function loadScripts() {
+  scripts.value = await getScripts()
+}
+
+// Auto-sync when storage changes (e.g. from another component or background)
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && changes.scripts) {
+    scripts.value = changes.scripts.newValue || []
+  }
+})
+
+export function useScripts() {
+  if (!initialized) {
+    initialized = true
+    loadScripts()
+  }
 
   async function addScript(
     name: string,
@@ -24,7 +38,7 @@ export function useScripts() {
       createdAt: Date.now(),
       updatedAt: Date.now(),
     }
-    scripts.value.push(script)
+    scripts.value = [...scripts.value, script]
     await saveScripts(scripts.value)
     return script
   }
@@ -37,11 +51,13 @@ export function useScripts() {
   async function updateScript(id: string, updates: Partial<SavedScript>) {
     const idx = scripts.value.findIndex((s) => s.id === id)
     if (idx !== -1) {
-      scripts.value[idx] = {
-        ...scripts.value[idx],
+      const updated = [...scripts.value]
+      updated[idx] = {
+        ...updated[idx],
         ...updates,
         updatedAt: Date.now(),
       }
+      scripts.value = updated
       await saveScripts(scripts.value)
     }
   }
