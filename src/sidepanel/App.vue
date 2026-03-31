@@ -24,9 +24,9 @@
       </div>
     </header>
     <main class="app-main">
-      <ChatPanel v-if="currentTab === 'chat'" @save-script="handleSaveScript" />
-      <ScriptManager v-else-if="currentTab === 'scripts'" />
-      <SettingsPanel v-else-if="currentTab === 'settings'" />
+      <ChatPanel v-show="currentTab === 'chat'" @save-script="handleSaveScript" />
+      <ScriptManager v-show="currentTab === 'scripts'" />
+      <SettingsPanel v-show="currentTab === 'settings'" />
     </main>
   </div>
 </template>
