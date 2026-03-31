@@ -57,29 +57,27 @@
     </div>
 
     <!-- Save dialog -->
-    <Teleport to="body">
-      <div v-if="showSaveDialog" class="dialog-overlay" @click.self="showSaveDialog = false">
-        <div class="dialog">
-          <h3>保存脚本</h3>
-          <div class="field">
-            <label>名称</label>
-            <input v-model="saveForm.name" placeholder="脚本名称" />
-          </div>
-          <div class="field">
-            <label>描述</label>
-            <input v-model="saveForm.description" placeholder="可选描述" />
-          </div>
-          <div class="field">
-            <label>URL 匹配</label>
-            <input v-model="saveForm.urlPattern" placeholder="*（匹配所有网页）" />
-          </div>
-          <div class="dialog-actions">
-            <button class="btn cancel" @click="showSaveDialog = false">取消</button>
-            <button class="btn confirm" @click="confirmSave">保存</button>
-          </div>
+    <div v-if="showSaveDialog" class="save-dialog-overlay" @click.self="showSaveDialog = false">
+      <div class="save-dialog">
+        <h3>保存脚本</h3>
+        <div class="save-field">
+          <label>名称</label>
+          <input v-model="saveForm.name" placeholder="脚本名称" />
+        </div>
+        <div class="save-field">
+          <label>描述</label>
+          <input v-model="saveForm.description" placeholder="可选描述" />
+        </div>
+        <div class="save-field">
+          <label>URL 匹配</label>
+          <input v-model="saveForm.urlPattern" placeholder="*（匹配所有网页）" />
+        </div>
+        <div class="save-dialog-actions">
+          <button class="save-btn-cancel" @click.stop="showSaveDialog = false">取消</button>
+          <button class="save-btn-confirm" @click.stop="confirmSave">保存</button>
         </div>
       </div>
-    </Teleport>
+    </div>
   </div>
 </template>
 
@@ -135,14 +133,19 @@ async function handleSave(code: string) {
 
 async function confirmSave() {
   if (!saveForm.value.name.trim()) return
-  await addScript(
-    saveForm.value.name,
-    pendingSaveCode.value,
-    saveForm.value.description,
-    saveForm.value.urlPattern || '*',
-  )
-  showSaveDialog.value = false
-  emit('save-script')
+  try {
+    await addScript(
+      saveForm.value.name,
+      pendingSaveCode.value,
+      saveForm.value.description,
+      saveForm.value.urlPattern || '*',
+    )
+    showSaveDialog.value = false
+    emit('save-script')
+  } catch (e) {
+    console.error('保存脚本失败:', e)
+    alert('保存失败: ' + (e instanceof Error ? e.message : String(e)))
+  }
 }
 
 function renderStream(text: string): string {
@@ -322,21 +325,18 @@ watch([messages, streamContent], scrollToBottom, { deep: true })
   cursor: not-allowed;
 }
 
-/* Save Dialog - uses Teleport so no scoped */
-</style>
-
-<style>
-.dialog-overlay {
+/* Save Dialog */
+.save-dialog-overlay {
   position: fixed;
   inset: 0;
   background: rgba(0,0,0,0.4);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 100;
+  z-index: 9999;
 }
 
-.dialog {
+.save-dialog {
   background: white;
   border-radius: 12px;
   padding: 20px;
@@ -344,16 +344,17 @@ watch([messages, streamContent], scrollToBottom, { deep: true })
   box-shadow: 0 8px 32px rgba(0,0,0,0.2);
 }
 
-.dialog h3 {
+.save-dialog h3 {
   margin-bottom: 14px;
   font-size: 16px;
+  color: #1a1a1a;
 }
 
-.dialog .field {
+.save-field {
   margin-bottom: 10px;
 }
 
-.dialog .field label {
+.save-field label {
   display: block;
   font-size: 12px;
   font-weight: 600;
@@ -361,26 +362,28 @@ watch([messages, streamContent], scrollToBottom, { deep: true })
   color: #555;
 }
 
-.dialog .field input {
+.save-field input {
   width: 100%;
   padding: 6px 8px;
   border: 1px solid #ddd;
   border-radius: 6px;
   outline: none;
+  box-sizing: border-box;
 }
 
-.dialog .field input:focus {
+.save-field input:focus {
   border-color: #6c5ce7;
 }
 
-.dialog-actions {
+.save-dialog-actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
   margin-top: 16px;
 }
 
-.btn {
+.save-btn-cancel,
+.save-btn-confirm {
   padding: 6px 16px;
   border: none;
   border-radius: 6px;
@@ -388,13 +391,17 @@ watch([messages, streamContent], scrollToBottom, { deep: true })
   cursor: pointer;
 }
 
-.btn.cancel {
+.save-btn-cancel {
   background: #eee;
   color: #555;
 }
 
-.btn.confirm {
+.save-btn-confirm {
   background: #6c5ce7;
   color: white;
+}
+
+.save-btn-confirm:hover {
+  background: #5b4bd5;
 }
 </style>
