@@ -55,6 +55,19 @@
         <p v-if="testError" class="test-error">{{ testError }}</p>
       </div>
 
+      <div class="field">
+        <label>
+          系统 Prompt
+          <button class="reset-btn" @click="resetPrompt">恢复默认</button>
+        </label>
+        <textarea
+          v-model="settings.systemPrompt"
+          rows="12"
+          placeholder="自定义系统 Prompt..."
+          @change="save"
+        ></textarea>
+      </div>
+
       <div class="hint">
         <p>💡 视觉模型会额外发送当前页面截图，有助于识别元素位置。</p>
         <p>💡 API Key 仅保存在本地，不会同步到其他设备。</p>
@@ -66,8 +79,14 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useSettings } from '../composables/useSettings'
+import { DEFAULT_SYSTEM_PROMPT } from '@/shared/types'
 
 const { settings, loading, save } = useSettings()
+
+function resetPrompt() {
+  settings.value.systemPrompt = DEFAULT_SYSTEM_PROMPT
+  save()
+}
 
 const testing = ref(false)
 const testResult = ref<'success' | 'fail' | null>(null)
@@ -127,6 +146,39 @@ async function testConnection() {
   font-weight: 600;
   margin-bottom: 4px;
   color: #333;
+}
+
+.field textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: white;
+  outline: none;
+  transition: border-color 0.2s;
+  resize: vertical;
+  font-family: monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  min-height: 120px;
+}
+
+.field textarea:focus {
+  border-color: #6c5ce7;
+}
+
+.reset-btn {
+  float: right;
+  font-size: 12px;
+  color: #6c5ce7;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-weight: normal;
+}
+
+.reset-btn:hover {
+  text-decoration: underline;
 }
 
 .field input,
