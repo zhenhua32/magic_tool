@@ -8,13 +8,16 @@ chrome.sidePanel
   .setPanelBehavior({ openPanelOnActionClick: true })
   .catch(console.error)
 
+// Handlers that use sendResponse asynchronously (need return true)
+const asyncHandlers = new Set(['CAPTURE_SCREENSHOT', 'GET_HTML', 'EXECUTE_CODE', 'AI_CHAT'])
+
 // Message routing
 chrome.runtime.onMessage.addListener(
   (message: ExtMessage, sender, sendResponse) => {
     const handler = messageHandlers[message.type]
     if (handler) {
       handler(message, sender, sendResponse)
-      return true // keep channel open for async
+      return asyncHandlers.has(message.type) // only keep channel open for handlers that call sendResponse
     }
     return false
   },

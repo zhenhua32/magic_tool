@@ -1,16 +1,5 @@
-import { extractHTML } from './dom-extractor'
-import type { ExtMessage } from '@/shared/types'
+// Content script entry point
+// HTML extraction is now handled via chrome.scripting.executeScript in the service worker
+// This file remains as an entry point for future content-script-specific features
 
-chrome.runtime.onMessage.addListener(
-  (message: ExtMessage, _sender, sendResponse) => {
-    if (message.type === 'GET_HTML') {
-      try {
-        const html = extractHTML()
-        sendResponse({ success: true, data: html })
-      } catch (e: any) {
-        sendResponse({ success: false, error: e.message })
-      }
-      return true
-    }
-  },
-)
+console.log('[MagicTool] Content script loaded')

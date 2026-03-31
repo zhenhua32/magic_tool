@@ -1,5 +1,0 @@
-(function(){var e=5e4,t=10,n=new Set([`SCRIPT`,`STYLE`,`NOSCRIPT`,`SVG`,`LINK`,`META`]),r=new Set([`id`,`class`,`name`,`type`,`value`,`href`,`src`,`alt`,`title`,`placeholder`,`role`,`aria-label`,`for`,`action`,`method`,`data-testid`,`data-id`]);function i(e,a){if(a>t)return``;if(e.nodeType===Node.TEXT_NODE){let t=e.textContent?.trim()??``;return t?t.slice(0,200):``}if(e.nodeType!==Node.ELEMENT_NODE)return``;let o=e;if(n.has(o.tagName))return``;let s=o.tagName.toLowerCase(),c=[];for(let e of o.attributes)r.has(e.name)&&c.push(`${e.name}="${e.value.slice(0,100)}"`);let l=c.length?` `+c.join(` `):``,u=Array.from(o.childNodes).map(e=>i(e,a+1)).filter(Boolean).join(`
-`);return!u&&!c.length&&o.childNodes.length===0?``:`<${s}${l}>${u?`
-`+u+`
-`:``}</${s}>`}function a(){let t=i(document.body,0);return t.length>e?t.slice(0,e)+`
-<!-- truncated -->`:t}chrome.runtime.onMessage.addListener((e,t,n)=>{if(e.type===`GET_HTML`){try{n({success:!0,data:a()})}catch(e){n({success:!1,error:e.message})}return!0}});})()

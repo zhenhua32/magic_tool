@@ -1,0 +1,1 @@
+(function(){console.log(`[MagicTool] Content script loaded`);})()

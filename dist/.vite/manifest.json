@@ -10,7 +10,7 @@
     "name": "storage"
   },
   "src/background/service-worker.ts": {
-    "file": "assets/service-worker.ts-HJmmD97d.js",
+    "file": "assets/service-worker.ts-BcPTSOTr.js",
     "name": "service-worker.ts",
     "src": "src/background/service-worker.ts",
     "isEntry": true,
@@ -19,7 +19,7 @@
     ]
   },
   "src/content/index.ts": {
-    "file": "assets/index.ts-B03erClg.js",
+    "file": "assets/index.ts-BxebbcAj.js",
     "name": "index.ts",
     "src": "src/content/index.ts",
     "isEntry": true
