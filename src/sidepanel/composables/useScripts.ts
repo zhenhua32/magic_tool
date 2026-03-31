@@ -13,7 +13,8 @@ async function loadScripts() {
 // Auto-sync when storage changes (e.g. from another component or background)
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local' && changes.scripts) {
-    scripts.value = changes.scripts.newValue || []
+    const newVal = changes.scripts.newValue
+    scripts.value = Array.isArray(newVal) ? newVal : []
   }
 })
 

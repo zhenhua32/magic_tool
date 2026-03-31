@@ -15,7 +15,7 @@ export function useChat() {
       code,
       timestamp: Date.now(),
     }
-    messages.value.push(msg)
+    messages.value = [...messages.value, msg]
     return msg
   }
 
