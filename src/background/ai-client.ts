@@ -47,6 +47,7 @@ export async function callAIStream(
   onChunk: (chunk: string) => void,
   onDone: () => void,
   onError: (error: string) => void,
+  signal?: AbortSignal,
 ): Promise<void> {
   const url = `${settings.apiBaseUrl.replace(/\/+$/, '')}/chat/completions`
 
@@ -65,8 +66,10 @@ export async function callAIStream(
         Authorization: `Bearer ${settings.apiKey}`,
       },
       body: JSON.stringify(body),
+      signal,
     })
   } catch (e: any) {
+    if (e.name === 'AbortError') { onDone(); return }
     onError(e.message || 'Network error')
     return
   }
@@ -87,7 +90,14 @@ export async function callAIStream(
   let buffer = ''
 
   while (true) {
-    const { done, value } = await reader.read()
+    let readResult: ReadableStreamReadResult<Uint8Array>
+    try {
+      readResult = await reader.read()
+    } catch (e: any) {
+      if (e.name === 'AbortError' || signal?.aborted) { reader.cancel().catch(() => {}); onDone(); return }
+      throw e
+    }
+    const { done, value } = readResult
     if (done) break
 
     buffer += decoder.decode(value, { stream: true })

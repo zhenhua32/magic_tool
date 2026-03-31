@@ -9,7 +9,10 @@ chrome.sidePanel
   .catch(console.error)
 
 // Handlers that use sendResponse asynchronously (need return true)
-const asyncHandlers = new Set(['CAPTURE_SCREENSHOT', 'GET_HTML', 'EXECUTE_CODE', 'AI_CHAT'])
+const asyncHandlers = new Set(['CAPTURE_SCREENSHOT', 'GET_HTML', 'EXECUTE_CODE', 'AI_CHAT', 'ABORT_STREAM'])
+
+// AbortController for current stream
+let currentStreamAbort: AbortController | null = null
 
 // Message routing
 chrome.runtime.onMessage.addListener(
@@ -172,6 +175,7 @@ const messageHandlers: Record<
       const { userMessage, html, screenshot } = msg.data
       const messages = buildMessages(settings, userMessage, html, screenshot)
 
+      currentStreamAbort = new AbortController()
       await callAIStream(
         settings,
         messages,
@@ -182,20 +186,32 @@ const messageHandlers: Record<
           })
         },
         () => {
+          currentStreamAbort = null
           chrome.runtime.sendMessage({ type: 'AI_CHAT_STREAM_DONE' })
         },
         (error) => {
+          currentStreamAbort = null
           chrome.runtime.sendMessage({
             type: 'AI_CHAT_STREAM_ERROR',
             data: error,
           })
         },
+        currentStreamAbort.signal,
       )
     } catch (e: any) {
+      currentStreamAbort = null
       chrome.runtime.sendMessage({
         type: 'AI_CHAT_STREAM_ERROR',
         data: e.message,
       })
     }
+  },
+
+  ABORT_STREAM: (_msg, _sender, sendResponse) => {
+    if (currentStreamAbort) {
+      currentStreamAbort.abort()
+      currentStreamAbort = null
+    }
+    sendResponse({ success: true })
   },
 }

@@ -44,8 +44,11 @@
           rows="2"
           :disabled="isLoading"
         ></textarea>
-        <button class="send-btn" @click="send" :disabled="isLoading || !inputText.trim()">
-          {{ isLoading ? '⏳' : '发送' }}
+        <button v-if="isLoading" class="stop-btn" @click="stopGeneration">
+          ⏹ 停止
+        </button>
+        <button v-else class="send-btn" @click="send" :disabled="!inputText.trim()">
+          发送
         </button>
       </div>
       <button
@@ -89,7 +92,7 @@ import MessageBubble from './MessageBubble.vue'
 
 const emit = defineEmits<{ 'save-script': [] }>()
 
-const { messages, isLoading, streamContent, sendMessage, executeCode, clearMessages } = useChat()
+const { messages, isLoading, streamContent, sendMessage, executeCode, clearMessages, stopGeneration } = useChat()
 const { addScript } = useScripts()
 
 const inputText = ref('')
@@ -301,6 +304,22 @@ watch([messages, streamContent], scrollToBottom, { deep: true })
 .send-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.stop-btn {
+  padding: 8px 16px;
+  background: #e74c3c;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  transition: background 0.2s;
+  align-self: flex-end;
+  cursor: pointer;
+}
+
+.stop-btn:hover {
+  background: #c0392b;
 }
 
 .clear-btn {

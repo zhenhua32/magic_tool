@@ -74,6 +74,7 @@ export function useChat() {
             streamContent.value += msg.data
           } else if (msg.type === 'AI_CHAT_STREAM_DONE') {
             chrome.runtime.onMessage.removeListener(streamListener)
+            currentStreamListener = null
             const content = streamContent.value
             const code = extractCode(content)
             addMessage('assistant', content, code)
@@ -81,12 +82,14 @@ export function useChat() {
             isLoading.value = false
           } else if (msg.type === 'AI_CHAT_STREAM_ERROR') {
             chrome.runtime.onMessage.removeListener(streamListener)
+            currentStreamListener = null
             addMessage('assistant', `❌ 错误: ${msg.data}`)
             streamContent.value = ''
             isLoading.value = false
           }
         }
 
+        currentStreamListener = streamListener
         chrome.runtime.onMessage.addListener(streamListener)
         chrome.runtime.sendMessage({
           type: 'AI_CHAT_STREAM',
@@ -118,6 +121,26 @@ export function useChat() {
     }
   }
 
+  let currentStreamListener: ((msg: any) => void) | null = null
+
+  function stopGeneration() {
+    // Remove stream listener
+    if (currentStreamListener) {
+      chrome.runtime.onMessage.removeListener(currentStreamListener)
+      currentStreamListener = null
+    }
+    // Tell background to abort fetch
+    chrome.runtime.sendMessage({ type: 'ABORT_STREAM' })
+    // Save whatever we have so far
+    if (streamContent.value) {
+      const content = streamContent.value
+      const code = extractCode(content)
+      addMessage('assistant', content + '\n\n⏹️ *已手动停止*', code)
+    }
+    streamContent.value = ''
+    isLoading.value = false
+  }
+
   function clearMessages() {
     messages.value = []
     streamContent.value = ''
@@ -132,5 +155,6 @@ export function useChat() {
     extractCode,
     addMessage,
     clearMessages,
+    stopGeneration,
   }
 }
