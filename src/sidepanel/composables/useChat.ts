@@ -118,6 +118,11 @@ export function useChat() {
     }
   }
 
+  function clearMessages() {
+    messages.value = []
+    streamContent.value = ''
+  }
+
   return {
     messages,
     isLoading,
@@ -126,5 +131,6 @@ export function useChat() {
     executeCode,
     extractCode,
     addMessage,
+    clearMessages,
   }
 }

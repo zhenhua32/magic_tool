@@ -36,40 +36,50 @@
     </div>
 
     <div class="input-area">
-      <textarea
-        v-model="inputText"
-        @keydown.enter.exact.prevent="send"
-        placeholder="描述你想执行的操作..."
-        rows="2"
+      <div class="input-row">
+        <textarea
+          v-model="inputText"
+          @keydown.enter.exact.prevent="send"
+          placeholder="描述你想执行的操作..."
+          rows="2"
+          :disabled="isLoading"
+        ></textarea>
+        <button class="send-btn" @click="send" :disabled="isLoading || !inputText.trim()">
+          {{ isLoading ? '⏳' : '发送' }}
+        </button>
+      </div>
+      <button
+        v-if="messages.length > 0"
+        class="clear-btn"
+        @click="clearMessages"
         :disabled="isLoading"
-      ></textarea>
-      <button class="send-btn" @click="send" :disabled="isLoading || !inputText.trim()">
-        {{ isLoading ? '⏳' : '发送' }}
-      </button>
+      >🗑️ 清空对话</button>
     </div>
 
     <!-- Save dialog -->
-    <div v-if="showSaveDialog" class="dialog-overlay" @click.self="showSaveDialog = false">
-      <div class="dialog">
-        <h3>保存脚本</h3>
-        <div class="field">
-          <label>名称</label>
-          <input v-model="saveForm.name" placeholder="脚本名称" />
-        </div>
-        <div class="field">
-          <label>描述</label>
-          <input v-model="saveForm.description" placeholder="可选描述" />
-        </div>
-        <div class="field">
-          <label>URL 匹配</label>
-          <input v-model="saveForm.urlPattern" placeholder="*（匹配所有网页）" />
-        </div>
-        <div class="dialog-actions">
-          <button class="btn cancel" @click="showSaveDialog = false">取消</button>
-          <button class="btn confirm" @click="confirmSave">保存</button>
+    <Teleport to="body">
+      <div v-if="showSaveDialog" class="dialog-overlay" @click.self="showSaveDialog = false">
+        <div class="dialog">
+          <h3>保存脚本</h3>
+          <div class="field">
+            <label>名称</label>
+            <input v-model="saveForm.name" placeholder="脚本名称" />
+          </div>
+          <div class="field">
+            <label>描述</label>
+            <input v-model="saveForm.description" placeholder="可选描述" />
+          </div>
+          <div class="field">
+            <label>URL 匹配</label>
+            <input v-model="saveForm.urlPattern" placeholder="*（匹配所有网页）" />
+          </div>
+          <div class="dialog-actions">
+            <button class="btn cancel" @click="showSaveDialog = false">取消</button>
+            <button class="btn confirm" @click="confirmSave">保存</button>
+          </div>
         </div>
       </div>
-    </div>
+    </Teleport>
   </div>
 </template>
 
@@ -81,7 +91,7 @@ import MessageBubble from './MessageBubble.vue'
 
 const emit = defineEmits<{ 'save-script': [] }>()
 
-const { messages, isLoading, streamContent, sendMessage, executeCode } = useChat()
+const { messages, isLoading, streamContent, sendMessage, executeCode, clearMessages } = useChat()
 const { addScript } = useScripts()
 
 const inputText = ref('')
@@ -107,9 +117,19 @@ async function handleExecute(code: string) {
   scrollToBottom()
 }
 
-function handleSave(code: string) {
+async function getCurrentTabUrl(): Promise<string> {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+    return tab?.url ?? '*'
+  } catch {
+    return '*'
+  }
+}
+
+async function handleSave(code: string) {
   pendingSaveCode.value = code
-  saveForm.value = { name: '', description: '', urlPattern: '*' }
+  const currentUrl = await getCurrentTabUrl()
+  saveForm.value = { name: '', description: '', urlPattern: currentUrl }
   showSaveDialog.value = true
 }
 
@@ -233,11 +253,17 @@ watch([messages, streamContent], scrollToBottom, { deep: true })
 
 .input-area {
   display: flex;
-  gap: 8px;
+  flex-direction: column;
+  gap: 6px;
   padding: 10px 12px;
   border-top: 1px solid #e0e0e0;
   background: white;
   flex-shrink: 0;
+}
+
+.input-row {
+  display: flex;
+  gap: 8px;
 }
 
 .input-area textarea {
@@ -274,7 +300,32 @@ watch([messages, streamContent], scrollToBottom, { deep: true })
   cursor: not-allowed;
 }
 
-/* Save Dialog */
+.clear-btn {
+  background: none;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: #999;
+  cursor: pointer;
+  align-self: flex-start;
+  transition: all 0.2s;
+}
+
+.clear-btn:hover:not(:disabled) {
+  color: #e74c3c;
+  border-color: #e74c3c;
+}
+
+.clear-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Save Dialog - uses Teleport so no scoped */
+</style>
+
+<style>
 .dialog-overlay {
   position: fixed;
   inset: 0;
