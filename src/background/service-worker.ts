@@ -54,10 +54,53 @@ const messageHandlers: Record<
         sendResponse({ success: false, error: 'No active tab' })
         return
       }
-      const results = await chrome.tabs.sendMessage(tab.id, {
-        type: 'GET_HTML',
+      const results = await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: () => {
+          const MAX_HTML_LENGTH = 50000
+          const MAX_DEPTH = 10
+          const SKIP_TAGS = new Set([
+            'SCRIPT', 'STYLE', 'NOSCRIPT', 'SVG', 'LINK', 'META',
+          ])
+          const KEEP_ATTRS = new Set([
+            'id', 'class', 'name', 'type', 'value', 'href', 'src', 'alt',
+            'title', 'placeholder', 'role', 'aria-label', 'for', 'action',
+            'method', 'data-testid', 'data-id',
+          ])
+          function extractNode(node: Node, depth: number): string {
+            if (depth > MAX_DEPTH) return ''
+            if (node.nodeType === Node.TEXT_NODE) {
+              const text = node.textContent?.trim() ?? ''
+              return text ? text.slice(0, 200) : ''
+            }
+            if (node.nodeType !== Node.ELEMENT_NODE) return ''
+            const el = node as Element
+            if (SKIP_TAGS.has(el.tagName)) return ''
+            const tag = el.tagName.toLowerCase()
+            const attrs: string[] = []
+            for (const attr of el.attributes) {
+              if (KEEP_ATTRS.has(attr.name)) {
+                attrs.push(`${attr.name}="${attr.value.slice(0, 100)}"`)
+              }
+            }
+            const attrStr = attrs.length ? ' ' + attrs.join(' ') : ''
+            const children = Array.from(el.childNodes)
+              .map((child) => extractNode(child, depth + 1))
+              .filter(Boolean)
+              .join('\n')
+            if (!children && !attrs.length && el.childNodes.length === 0) return ''
+            return `<${tag}${attrStr}>${children ? '\n' + children + '\n' : ''}</${tag}>`
+          }
+          let html = extractNode(document.body, 0)
+          if (html.length > MAX_HTML_LENGTH) {
+            html = html.slice(0, MAX_HTML_LENGTH) + '\n<!-- truncated -->'
+          }
+          return html
+        },
+        world: 'MAIN',
       })
-      sendResponse(results)
+      const html = results[0]?.result ?? ''
+      sendResponse({ success: true, data: html })
     } catch (e: any) {
       sendResponse({ success: false, error: e.message })
     }
