@@ -39,7 +39,8 @@ export function useScripts() {
       createdAt: Date.now(),
       updatedAt: Date.now(),
     }
-    scripts.value = [...scripts.value, script]
+    const current = Array.isArray(scripts.value) ? scripts.value : []
+    scripts.value = [...current, script]
     await saveScripts(scripts.value)
     return script
   }
