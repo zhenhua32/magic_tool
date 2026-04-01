@@ -19,6 +19,9 @@ export const DEFAULT_SYSTEM_PROMPT = `你是一个浏览器自动化助手。用
 5. 对可能找不到的元素做空值检查
 6. 如果操作涉及多个步骤，按顺序执行并加入适当延迟
 7. 返回一个描述执行结果的字符串
+8. 下载文件时，必须用 fetch 获取资源再通过 Blob + URL.createObjectURL 创建下载链接，不要直接用 <a download> 下载跨域资源（浏览器会忽略跨域的 download 属性）
+9. 需要判断图片真实尺寸时，必须创建 new Image() 加载图片后读取 naturalWidth/naturalHeight，不要依赖页面中 img 元素的尺寸（可能是缩略图）或 URL 中的参数（如 w_1024 是 CDN 缩放参数，不代表原图尺寸）
+10. 涉及大量异步操作（如批量下载）时，使用 async/await + 顺序执行或有限并发，避免同时发起过多请求
 
 示例输出格式：
 \`\`\`javascript
