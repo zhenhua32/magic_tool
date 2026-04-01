@@ -5,17 +5,17 @@
     "src": "../../../@crx/manifest",
     "isEntry": true
   },
-  "_storage-C9aF62qG.js": {
-    "file": "assets/storage-C9aF62qG.js",
+  "_storage-CWmc-NQC.js": {
+    "file": "assets/storage-CWmc-NQC.js",
     "name": "storage"
   },
   "src/background/service-worker.ts": {
-    "file": "assets/service-worker.ts-LEezBZ5W.js",
+    "file": "assets/service-worker.ts-B_aAwhWh.js",
     "name": "service-worker.ts",
     "src": "src/background/service-worker.ts",
     "isEntry": true,
     "imports": [
-      "_storage-C9aF62qG.js"
+      "_storage-CWmc-NQC.js"
     ]
   },
   "src/content/index.ts": {
@@ -25,12 +25,12 @@
     "isEntry": true
   },
   "src/sidepanel/index.html": {
-    "file": "assets/sidepanel-BZi7wCgV.js",
+    "file": "assets/sidepanel-CUxDNZmr.js",
     "name": "sidepanel",
     "src": "src/sidepanel/index.html",
     "isEntry": true,
     "imports": [
-      "_storage-C9aF62qG.js"
+      "_storage-CWmc-NQC.js"
     ],
     "css": [
       "assets/sidepanel--f8veGRH.css"
