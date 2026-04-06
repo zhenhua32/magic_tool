@@ -10,12 +10,13 @@ export function useChat() {
   const streamContent = ref('')
   const retryCount = ref(0)
 
-  function addMessage(role: ChatMessage['role'], content: string, code?: string): ChatMessage {
+  function addMessage(role: ChatMessage['role'], content: string, code?: string, screenshot?: string): ChatMessage {
     const msg: ChatMessage = {
       id: generateId(),
       role,
       content,
       code,
+      screenshot,
       timestamp: Date.now(),
     }
     messages.value = [...messages.value, msg]
@@ -189,7 +190,6 @@ export function useChat() {
   async function sendMessage(userText: string, useStream: boolean = true) {
     if (!userText.trim() || isLoading.value) return
 
-    addMessage('user', userText)
     isLoading.value = true
     streamContent.value = ''
     retryCount.value = 0
@@ -204,6 +204,9 @@ export function useChat() {
       if (settings?.modelType === 'vision') {
         screenshot = await captureScreenshot()
       }
+
+      // Add user message with screenshot (if vision model)
+      addMessage('user', userText, undefined, screenshot)
 
       await callAIWithHistory(userText, html, screenshot, useStream)
     } catch (e: any) {

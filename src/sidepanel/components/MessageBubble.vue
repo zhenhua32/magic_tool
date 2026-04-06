@@ -2,6 +2,12 @@
   <div class="message-bubble" :class="[message.role]">
     <div class="bubble-content">
       <div class="text" v-html="renderedContent"></div>
+      <div v-if="message.screenshot" class="screenshot-preview">
+        <img :src="message.screenshot" alt="页面截图" @click="expandScreenshot = !expandScreenshot" />
+        <div v-if="expandScreenshot" class="screenshot-overlay" @click="expandScreenshot = false">
+          <img :src="message.screenshot" alt="页面截图（大图）" />
+        </div>
+      </div>
       <CodeBlock
         v-if="message.code"
         :code="message.code"
@@ -14,7 +20,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import type { ChatMessage } from '@/shared/types'
 import CodeBlock from './CodeBlock.vue'
 
@@ -23,6 +29,8 @@ defineEmits<{
   execute: [code: string]
   save: [code: string]
 }>()
+
+const expandScreenshot = ref(false)
 
 const renderedContent = computed(() => {
   let text = props.message.content
@@ -98,5 +106,39 @@ function formatTime(ts: number): string {
 
 .user .timestamp {
   text-align: right;
+}
+
+.screenshot-preview {
+  margin-top: 8px;
+  cursor: pointer;
+}
+
+.screenshot-preview > img {
+  max-width: 100%;
+  max-height: 160px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.3);
+  object-fit: contain;
+}
+
+.screenshot-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  cursor: pointer;
+}
+
+.screenshot-overlay img {
+  max-width: 95%;
+  max-height: 95%;
+  border-radius: 8px;
+  object-fit: contain;
 }
 </style>

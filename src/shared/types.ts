@@ -78,6 +78,7 @@ export interface ChatMessage {
   role: 'user' | 'assistant' | 'system'
   content: string
   code?: string
+  screenshot?: string
   timestamp: number
 }
 
