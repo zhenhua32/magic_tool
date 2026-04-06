@@ -53,38 +53,57 @@ export function useChat() {
     return match?.[1]?.trim()
   }
 
-  /** Run AI-generated code and auto-retry on failure */
-  async function executeAndRetry(
-    code: string,
-    html: string,
-    screenshot: string | undefined,
-  ) {
+  /** Execute code and auto-retry with AI on failure (called on manual execute) */
+  async function executeAndRetry(code: string): Promise<{ success: boolean; result?: string; error?: string }> {
+    retryCount.value = 0
+    return await doExecuteWithRetry(code)
+  }
+
+  async function doExecuteWithRetry(code: string): Promise<{ success: boolean; result?: string; error?: string }> {
     const execResult = await executeCode(code)
 
     if (execResult.success) {
       addMessage('system', `✅ 执行成功: ${execResult.result ?? 'done'}`)
       retryCount.value = 0
-      return
+      return execResult
     }
 
     // Execution failed
-    const errorMsg = `❌ 执行失败: ${execResult.error}`
-    addMessage('system', errorMsg)
+    addMessage('system', `❌ 执行失败: ${execResult.error}`)
 
     if (retryCount.value >= MAX_RETRIES) {
       addMessage('system', `⚠️ 已达到最大重试次数 (${MAX_RETRIES})，请检查需求描述或手动调整代码`)
       retryCount.value = 0
-      return
+      return execResult
     }
 
     retryCount.value++
     const retryMessage = `代码执行失败，错误信息: ${execResult.error}\n请根据错误信息修正代码。`
     addMessage('user', retryMessage)
 
-    // Re-fetch HTML in case the page changed
-    const freshHtml = await getPageHTML()
+    // Re-fetch HTML and ask AI to fix
+    isLoading.value = true
+    try {
+      const freshHtml = await getPageHTML()
+      const settingsResult = await chrome.storage.local.get('settings')
+      const settings = settingsResult.settings
+      let screenshot: string | undefined
+      if (settings?.modelType === 'vision') {
+        screenshot = await captureScreenshot()
+      }
+      await callAIWithHistory(retryMessage, freshHtml, screenshot)
 
-    await callAIWithHistory(retryMessage, freshHtml, screenshot)
+      // Find the latest assistant message with code
+      const lastAssistant = [...messages.value].reverse().find(m => m.role === 'assistant' && m.code)
+      if (lastAssistant?.code) {
+        return await doExecuteWithRetry(lastAssistant.code)
+      }
+    } finally {
+      isLoading.value = false
+    }
+
+    retryCount.value = 0
+    return execResult
   }
 
   /** Core AI call that sends conversation history */
@@ -121,17 +140,8 @@ export function useChat() {
           const code = extractCode(content)
           addMessage('assistant', content, code)
           streamContent.value = ''
-
-          if (code) {
-            // Auto-execute and potentially retry
-            executeAndRetry(code, html, screenshot).then(() => {
-              isLoading.value = false
-              resolve()
-            })
-          } else {
-            isLoading.value = false
-            resolve()
-          }
+          isLoading.value = false
+          resolve()
         } else if (msg.type === 'AI_CHAT_STREAM_ERROR') {
           chrome.runtime.onMessage.removeListener(streamListener)
           currentStreamListener = null
@@ -171,10 +181,6 @@ export function useChat() {
     if (result?.success) {
       const code = extractCode(result.data)
       addMessage('assistant', result.data, code)
-
-      if (code) {
-        await executeAndRetry(code, html, screenshot)
-      }
     } else {
       addMessage('assistant', `❌ 错误: ${result?.error ?? '未知错误'}`)
     }
@@ -240,6 +246,7 @@ export function useChat() {
     retryCount,
     sendMessage,
     executeCode,
+    executeAndRetry,
     extractCode,
     addMessage,
     clearMessages,

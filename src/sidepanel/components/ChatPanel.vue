@@ -92,7 +92,7 @@ import MessageBubble from './MessageBubble.vue'
 
 const emit = defineEmits<{ 'save-script': [] }>()
 
-const { messages, isLoading, streamContent, sendMessage, executeCode, clearMessages, stopGeneration } = useChat()
+const { messages, isLoading, streamContent, sendMessage, executeAndRetry, clearMessages, stopGeneration } = useChat()
 const { addScript } = useScripts()
 
 const inputText = ref('')
@@ -113,7 +113,7 @@ function send() {
 
 async function handleExecute(code: string) {
   execResult.value = null
-  const result = await executeCode(code)
+  const result = await executeAndRetry(code)
   execResult.value = result
   scrollToBottom()
 }
