@@ -72,7 +72,19 @@ const messageHandlers: Record<
             'id', 'class', 'name', 'type', 'value', 'href', 'src', 'alt',
             'title', 'placeholder', 'role', 'aria-label', 'for', 'action',
             'method', 'data-testid', 'data-id',
+            'disabled', 'checked', 'selected', 'readonly', 'required',
+            'aria-disabled', 'aria-hidden', 'aria-expanded',
           ])
+          const INTERACTIVE_TAGS = new Set([
+            'A', 'BUTTON', 'INPUT', 'SELECT', 'TEXTAREA', 'LABEL',
+            'DETAILS', 'SUMMARY',
+          ])
+          function isElementVisible(el: Element): boolean {
+            const style = window.getComputedStyle(el)
+            if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return false
+            const rect = el.getBoundingClientRect()
+            return rect.width > 0 && rect.height > 0
+          }
           function extractNode(node: Node, depth: number): string {
             if (depth > MAX_DEPTH) return ''
             if (node.nodeType === Node.TEXT_NODE) {
@@ -87,6 +99,15 @@ const messageHandlers: Record<
             for (const attr of el.attributes) {
               if (KEEP_ATTRS.has(attr.name)) {
                 attrs.push(`${attr.name}="${attr.value.slice(0, 100)}"`)
+              }
+            }
+            if (INTERACTIVE_TAGS.has(el.tagName) || el.getAttribute('role') === 'button' || el.getAttribute('onclick')) {
+              const visible = isElementVisible(el)
+              attrs.push(`data-visible="${visible}"`)
+              if ((el as HTMLButtonElement).disabled) {
+                if (!attrs.some(a => a.startsWith('disabled'))) {
+                  attrs.push('disabled="true"')
+                }
               }
             }
             const attrStr = attrs.length ? ' ' + attrs.join(' ') : ''
@@ -122,7 +143,11 @@ const messageHandlers: Record<
         sendResponse({ success: false, error: 'No active tab' })
         return
       }
-      const results = await chrome.scripting.executeScript({
+      const EXEC_TIMEOUT = 30000
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('代码执行超时（30秒）')), EXEC_TIMEOUT),
+      )
+      const execPromise = chrome.scripting.executeScript({
         target: { tabId: tab.id },
         func: (code: string) => {
           try {
@@ -136,6 +161,7 @@ const messageHandlers: Record<
         args: [msg.data.code],
         world: 'MAIN',
       })
+      const results = await Promise.race([execPromise, timeoutPromise])
       const execResult: ExecuteResult = results[0]?.result ?? {
         success: false,
         error: 'No result',
@@ -153,8 +179,8 @@ const messageHandlers: Record<
         sendResponse({ success: false, error: '请先配置 API Key' })
         return
       }
-      const { userMessage, html, screenshot } = msg.data
-      const messages = buildMessages(settings, userMessage, html, screenshot)
+      const { userMessage, html, screenshot, history } = msg.data
+      const messages = buildMessages(settings, userMessage, html, screenshot, history)
       const reply = await callAI(settings, messages)
       sendResponse({ success: true, data: reply })
     } catch (e: any) {
@@ -172,8 +198,8 @@ const messageHandlers: Record<
         })
         return
       }
-      const { userMessage, html, screenshot } = msg.data
-      const messages = buildMessages(settings, userMessage, html, screenshot)
+      const { userMessage, html, screenshot, history } = msg.data
+      const messages = buildMessages(settings, userMessage, html, screenshot, history)
 
       currentStreamAbort = new AbortController()
       await callAIStream(

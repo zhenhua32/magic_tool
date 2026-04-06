@@ -2,10 +2,13 @@ import { ref } from 'vue'
 import type { ChatMessage } from '@/shared/types'
 import { generateId } from '@/shared/storage'
 
+const MAX_RETRIES = 2
+
 export function useChat() {
   const messages = ref<ChatMessage[]>([])
   const isLoading = ref(false)
   const streamContent = ref('')
+  const retryCount = ref(0)
 
   function addMessage(role: ChatMessage['role'], content: string, code?: string): ChatMessage {
     const msg: ChatMessage = {
@@ -45,8 +48,136 @@ export function useChat() {
   }
 
   function extractCode(text: string): string | undefined {
-    const match = text.match(/```javascript\s*\n([\s\S]*?)\n```/)
+    // Support ```javascript, ```js, ```typescript, ```ts
+    const match = text.match(/```(?:javascript|js|typescript|ts)\s*\n([\s\S]*?)\n```/)
     return match?.[1]?.trim()
+  }
+
+  /** Run AI-generated code and auto-retry on failure */
+  async function executeAndRetry(
+    code: string,
+    html: string,
+    screenshot: string | undefined,
+  ) {
+    const execResult = await executeCode(code)
+
+    if (execResult.success) {
+      addMessage('system', `✅ 执行成功: ${execResult.result ?? 'done'}`)
+      retryCount.value = 0
+      return
+    }
+
+    // Execution failed
+    const errorMsg = `❌ 执行失败: ${execResult.error}`
+    addMessage('system', errorMsg)
+
+    if (retryCount.value >= MAX_RETRIES) {
+      addMessage('system', `⚠️ 已达到最大重试次数 (${MAX_RETRIES})，请检查需求描述或手动调整代码`)
+      retryCount.value = 0
+      return
+    }
+
+    retryCount.value++
+    const retryMessage = `代码执行失败，错误信息: ${execResult.error}\n请根据错误信息修正代码。`
+    addMessage('user', retryMessage)
+
+    // Re-fetch HTML in case the page changed
+    const freshHtml = await getPageHTML()
+
+    await callAIWithHistory(retryMessage, freshHtml, screenshot)
+  }
+
+  /** Core AI call that sends conversation history */
+  async function callAIWithHistory(
+    userMessage: string,
+    html: string,
+    screenshot: string | undefined,
+    useStream: boolean = true,
+  ) {
+    // Build history from messages (exclude the last user message which we just added)
+    const history = messages.value.slice()
+
+    if (useStream) {
+      await callAIStream(userMessage, html, screenshot, history)
+    } else {
+      await callAINonStream(userMessage, html, screenshot, history)
+    }
+  }
+
+  async function callAIStream(
+    userMessage: string,
+    html: string,
+    screenshot: string | undefined,
+    history: ChatMessage[],
+  ) {
+    return new Promise<void>((resolve) => {
+      const streamListener = (msg: any) => {
+        if (msg.type === 'AI_CHAT_STREAM_CHUNK') {
+          streamContent.value += msg.data
+        } else if (msg.type === 'AI_CHAT_STREAM_DONE') {
+          chrome.runtime.onMessage.removeListener(streamListener)
+          currentStreamListener = null
+          const content = streamContent.value
+          const code = extractCode(content)
+          addMessage('assistant', content, code)
+          streamContent.value = ''
+
+          if (code) {
+            // Auto-execute and potentially retry
+            executeAndRetry(code, html, screenshot).then(() => {
+              isLoading.value = false
+              resolve()
+            })
+          } else {
+            isLoading.value = false
+            resolve()
+          }
+        } else if (msg.type === 'AI_CHAT_STREAM_ERROR') {
+          chrome.runtime.onMessage.removeListener(streamListener)
+          currentStreamListener = null
+          addMessage('assistant', `❌ 错误: ${msg.data}`)
+          streamContent.value = ''
+          isLoading.value = false
+          resolve()
+        }
+      }
+
+      currentStreamListener = streamListener
+      chrome.runtime.onMessage.addListener(streamListener)
+      streamContent.value = ''
+      chrome.runtime.sendMessage({
+        type: 'AI_CHAT_STREAM',
+        data: { userMessage, html, screenshot, history },
+      })
+    })
+  }
+
+  async function callAINonStream(
+    userMessage: string,
+    html: string,
+    screenshot: string | undefined,
+    history: ChatMessage[],
+  ) {
+    const result = await new Promise<any>((resolve) => {
+      chrome.runtime.sendMessage(
+        {
+          type: 'AI_CHAT',
+          data: { userMessage, html, screenshot, history },
+        },
+        resolve,
+      )
+    })
+
+    if (result?.success) {
+      const code = extractCode(result.data)
+      addMessage('assistant', result.data, code)
+
+      if (code) {
+        await executeAndRetry(code, html, screenshot)
+      }
+    } else {
+      addMessage('assistant', `❌ 错误: ${result?.error ?? '未知错误'}`)
+    }
   }
 
   async function sendMessage(userText: string, useStream: boolean = true) {
@@ -55,6 +186,7 @@ export function useChat() {
     addMessage('user', userText)
     isLoading.value = true
     streamContent.value = ''
+    retryCount.value = 0
 
     try {
       const html = await getPageHTML()
@@ -67,54 +199,7 @@ export function useChat() {
         screenshot = await captureScreenshot()
       }
 
-      if (useStream) {
-        // Stream mode
-        const streamListener = (msg: any) => {
-          if (msg.type === 'AI_CHAT_STREAM_CHUNK') {
-            streamContent.value += msg.data
-          } else if (msg.type === 'AI_CHAT_STREAM_DONE') {
-            chrome.runtime.onMessage.removeListener(streamListener)
-            currentStreamListener = null
-            const content = streamContent.value
-            const code = extractCode(content)
-            addMessage('assistant', content, code)
-            streamContent.value = ''
-            isLoading.value = false
-          } else if (msg.type === 'AI_CHAT_STREAM_ERROR') {
-            chrome.runtime.onMessage.removeListener(streamListener)
-            currentStreamListener = null
-            addMessage('assistant', `❌ 错误: ${msg.data}`)
-            streamContent.value = ''
-            isLoading.value = false
-          }
-        }
-
-        currentStreamListener = streamListener
-        chrome.runtime.onMessage.addListener(streamListener)
-        chrome.runtime.sendMessage({
-          type: 'AI_CHAT_STREAM',
-          data: { userMessage: userText, html, screenshot },
-        })
-      } else {
-        // Non-stream mode
-        const result = await new Promise<any>((resolve) => {
-          chrome.runtime.sendMessage(
-            {
-              type: 'AI_CHAT',
-              data: { userMessage: userText, html, screenshot },
-            },
-            resolve,
-          )
-        })
-
-        if (result?.success) {
-          const code = extractCode(result.data)
-          addMessage('assistant', result.data, code)
-        } else {
-          addMessage('assistant', `❌ 错误: ${result?.error ?? '未知错误'}`)
-        }
-        isLoading.value = false
-      }
+      await callAIWithHistory(userText, html, screenshot, useStream)
     } catch (e: any) {
       addMessage('assistant', `❌ 错误: ${e.message}`)
       isLoading.value = false
@@ -139,17 +224,20 @@ export function useChat() {
     }
     streamContent.value = ''
     isLoading.value = false
+    retryCount.value = 0
   }
 
   function clearMessages() {
     messages.value = []
     streamContent.value = ''
+    retryCount.value = 0
   }
 
   return {
     messages,
     isLoading,
     streamContent,
+    retryCount,
     sendMessage,
     executeCode,
     extractCode,
