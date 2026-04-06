@@ -16,6 +16,7 @@ export async function callAI(
   messages: ChatCompletionMessage[],
 ): Promise<string> {
   const url = `${settings.apiBaseUrl.replace(/\/+$/, '')}/chat/completions`
+  const timeoutMs = (settings.requestTimeout || 300) * 1000
 
   const body: ChatCompletionRequest = {
     model: settings.modelName,
@@ -30,6 +31,10 @@ export async function callAI(
       Authorization: `Bearer ${settings.apiKey}`,
     },
     body: JSON.stringify(body),
+    signal: AbortSignal.timeout(timeoutMs),
+  }).catch((e: any) => {
+    if (e.name === 'TimeoutError') throw new Error(`AI 请求超时（${settings.requestTimeout || 300}秒），请检查网络或稍后重试`)
+    throw e
   })
 
   if (!response.ok) {
@@ -57,6 +62,14 @@ export async function callAIStream(
     stream: true,
   }
 
+  // Combine external abort signal with timeout
+  const timeoutMs = (settings.requestTimeout || 300) * 1000
+  const timeoutController = new AbortController()
+  const timeoutId = setTimeout(() => timeoutController.abort(), timeoutMs)
+  const combinedSignal = signal
+    ? AbortSignal.any([signal, timeoutController.signal])
+    : timeoutController.signal
+
   let response: Response
   try {
     response = await fetch(url, {
@@ -66,10 +79,16 @@ export async function callAIStream(
         Authorization: `Bearer ${settings.apiKey}`,
       },
       body: JSON.stringify(body),
-      signal,
+      signal: combinedSignal,
     })
+    clearTimeout(timeoutId)
   } catch (e: any) {
-    if (e.name === 'AbortError') { onDone(); return }
+    clearTimeout(timeoutId)
+    if (signal?.aborted) { onDone(); return }
+    if (e.name === 'AbortError' || e.name === 'TimeoutError') {
+      onError(`AI 请求超时（${settings.requestTimeout || 300}秒），请检查网络或稍后重试`)
+      return
+    }
     onError(e.message || 'Network error')
     return
   }

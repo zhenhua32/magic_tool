@@ -40,6 +40,18 @@
         />
       </div>
 
+      <div class="field">
+        <label>请求超时（秒）</label>
+        <input
+          v-model.number="settings.requestTimeout"
+          type="number"
+          min="10"
+          max="600"
+          placeholder="300"
+          @change="save"
+        />
+      </div>
+
       <div class="test-section">
         <button
           class="test-btn"

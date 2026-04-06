@@ -5,6 +5,7 @@ export interface Settings {
   modelType: 'text' | 'vision'
   modelName: string
   systemPrompt: string
+  requestTimeout: number
 }
 
 export const DEFAULT_SYSTEM_PROMPT = `你是一个浏览器自动化助手。用户会给你当前网页的 HTML 内容（可能还有截图）以及他们想要执行的操作。
@@ -70,6 +71,7 @@ export const DEFAULT_SETTINGS: Settings = {
   modelType: 'text',
   modelName: 'gpt-4o',
   systemPrompt: DEFAULT_SYSTEM_PROMPT,
+  requestTimeout: 300,
 }
 
 // ===== Chat =====
