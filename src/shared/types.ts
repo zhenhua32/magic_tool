@@ -6,6 +6,8 @@ export interface Settings {
   modelName: string
   systemPrompt: string
   requestTimeout: number
+  maxAgentSteps: number
+  waitAfterExecution: number
 }
 
 export const DEFAULT_SYSTEM_PROMPT = `你是一个浏览器自动化助手。用户会给你当前网页的 HTML 内容（可能还有截图）以及他们想要执行的操作。
@@ -72,6 +74,8 @@ export const DEFAULT_SETTINGS: Settings = {
   modelName: 'gpt-4o',
   systemPrompt: DEFAULT_SYSTEM_PROMPT,
   requestTimeout: 300,
+  maxAgentSteps: 10,
+  waitAfterExecution: 1500,
 }
 
 // ===== Chat =====
@@ -108,6 +112,7 @@ export type MessageType =
   | 'AI_CHAT_STREAM_CHUNK'
   | 'AI_CHAT_STREAM_DONE'
   | 'AI_CHAT_STREAM_ERROR'
+  | 'WAIT_FOR_STABLE'
 
 export interface ExtMessage<T = any> {
   type: MessageType
@@ -123,4 +128,23 @@ export interface ExecuteResult {
 export interface AIChatRequest {
   messages: { role: string; content: any }[]
   stream?: boolean
+}
+
+// ===== Agent Mode =====
+export type AgentState = 'idle' | 'running' | 'paused' | 'completed' | 'failed'
+
+export interface AgentAction {
+  thought: string
+  code: string
+  done: boolean
+  summary?: string
+}
+
+export interface AgentStep {
+  index: number
+  action: AgentAction
+  executionResult?: ExecuteResult
+  htmlSnapshot?: string
+  screenshot?: string
+  timestamp: number
 }

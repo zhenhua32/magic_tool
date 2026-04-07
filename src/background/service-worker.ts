@@ -1,7 +1,7 @@
 import type { ExtMessage, ExecuteResult } from '@/shared/types'
 import { getSettings } from '@/shared/storage'
 import { callAI, callAIStream } from './ai-client'
-import { buildMessages } from './prompt-builder'
+import { buildMessages, buildAgentMessages, buildAgentFeedbackMessage } from './prompt-builder'
 
 // Open side panel on action click
 chrome.sidePanel
@@ -9,7 +9,7 @@ chrome.sidePanel
   .catch(console.error)
 
 // Handlers that use sendResponse asynchronously (need return true)
-const asyncHandlers = new Set(['CAPTURE_SCREENSHOT', 'GET_HTML', 'EXECUTE_CODE', 'AI_CHAT', 'ABORT_STREAM'])
+const asyncHandlers = new Set(['CAPTURE_SCREENSHOT', 'GET_HTML', 'EXECUTE_CODE', 'AI_CHAT', 'ABORT_STREAM', 'WAIT_FOR_STABLE', 'AI_CHAT_AGENT'])
 
 // AbortController for current stream
 let currentStreamAbort: AbortController | null = null
@@ -239,5 +239,61 @@ const messageHandlers: Record<
       currentStreamAbort = null
     }
     sendResponse({ success: true })
+  },
+
+  WAIT_FOR_STABLE: async (msg, _sender, sendResponse) => {
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+      if (!tab?.id) {
+        sendResponse({ success: false, error: 'No active tab' })
+        return
+      }
+      const timeout = msg.data?.timeout ?? 1500
+      const results = await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: (timeoutMs: number) => {
+          return new Promise<boolean>((resolve) => {
+            let timer: ReturnType<typeof setTimeout>
+            let settled = false
+            const observer = new MutationObserver(() => {
+              clearTimeout(timer)
+              timer = setTimeout(() => {
+                if (!settled) { settled = true; observer.disconnect(); resolve(true) }
+              }, 300)
+            })
+            observer.observe(document.body, { childList: true, subtree: true, attributes: true })
+            // Initial settle timer — if no mutations happen, resolve after 300ms
+            timer = setTimeout(() => {
+              if (!settled) { settled = true; observer.disconnect(); resolve(true) }
+            }, 300)
+            // Hard timeout
+            setTimeout(() => {
+              if (!settled) { settled = true; observer.disconnect(); resolve(true) }
+            }, timeoutMs)
+          })
+        },
+        args: [timeout],
+        world: 'MAIN',
+      })
+      sendResponse({ success: true, data: results[0]?.result })
+    } catch (e: any) {
+      sendResponse({ success: false, error: e.message })
+    }
+  },
+
+  AI_CHAT_AGENT: async (msg, _sender, sendResponse) => {
+    try {
+      const settings = await getSettings()
+      if (!settings.apiKey) {
+        sendResponse({ success: false, error: '请先配置 API Key' })
+        return
+      }
+      const { task, html, screenshot, history } = msg.data
+      const messages = buildAgentMessages(settings, task, html, screenshot, history)
+      const reply = await callAI(settings, messages)
+      sendResponse({ success: true, data: reply })
+    } catch (e: any) {
+      sendResponse({ success: false, error: e.message })
+    }
   },
 }

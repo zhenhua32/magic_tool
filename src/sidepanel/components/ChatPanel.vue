@@ -1,28 +1,37 @@
 <template>
   <div class="chat-panel">
     <div class="messages" ref="messagesContainer">
-      <div v-if="messages.length === 0" class="empty-state">
+      <div v-if="displayMessages.length === 0" class="empty-state">
         <p>🪄 你好！告诉我你想在网页上做什么。</p>
         <p class="hint">例如："点击登录按钮"、"填写搜索框并搜索'Vue'"</p>
+        <p v-if="agentMode" class="hint">🤖 Agent 模式已开启，将自动执行并迭代</p>
       </div>
 
       <MessageBubble
-        v-for="msg in messages"
+        v-for="msg in displayMessages"
         :key="msg.id"
         :message="msg"
         @execute="handleExecute"
         @save="handleSave"
       />
 
+      <!-- Agent progress bar -->
+      <div v-if="agentMode && isAgentBusy" class="agent-progress">
+        <div class="agent-progress-bar">
+          <div class="agent-progress-fill" :style="{ width: agentProgressPercent + '%' }"></div>
+        </div>
+        <span class="agent-progress-text">步骤 {{ currentStepIndex + 1 }} / {{ maxSteps }}</span>
+      </div>
+
       <!-- Streaming indicator -->
-      <div v-if="isLoading && streamContent" class="message-bubble assistant">
+      <div v-if="isLoading && streamContent && !agentMode" class="message-bubble assistant">
         <div class="bubble-content streaming">
           <div v-html="renderStream(streamContent)"></div>
           <span class="cursor">▊</span>
         </div>
       </div>
 
-      <div v-if="isLoading && !streamContent" class="loading-indicator">
+      <div v-if="(isLoading && !streamContent && !agentMode) || isAgentBusy" class="loading-indicator">
         <span class="dot"></span>
         <span class="dot"></span>
         <span class="dot"></span>
@@ -36,27 +45,47 @@
     </div>
 
     <div class="input-area">
+      <div class="mode-toggle">
+        <button
+          class="mode-btn"
+          :class="{ active: !agentMode }"
+          @click="agentMode = false"
+        >💬 对话</button>
+        <button
+          class="mode-btn"
+          :class="{ active: agentMode }"
+          @click="agentMode = true"
+        >🤖 Agent</button>
+      </div>
       <div class="input-row">
         <textarea
           v-model="inputText"
           @keydown.enter.exact.prevent="send"
-          placeholder="描述你想执行的操作..."
+          :placeholder="agentMode ? '描述让 Agent 自动完成的任务...' : '描述你想执行的操作...'"
           rows="2"
-          :disabled="isLoading"
+          :disabled="isLoading || isAgentBusy"
         ></textarea>
-        <button v-if="isLoading" class="stop-btn" @click="stopGeneration">
+        <button v-if="isLoading && !agentMode" class="stop-btn" @click="stopGeneration">
           ⏹ 停止
+        </button>
+        <button v-else-if="isAgentBusy" class="stop-btn" @click="handleStopAgent">
+          ⏹ 停止
+        </button>
+        <button v-else-if="agentState === 'paused'" class="resume-btn" @click="handleResumeAgent">
+          ▶ 继续
         </button>
         <button v-else class="send-btn" @click="send" :disabled="!inputText.trim()">
           发送
         </button>
       </div>
-      <button
-        v-if="messages.length > 0"
-        class="clear-btn"
-        @click="clearMessages"
-        :disabled="isLoading"
-      >🗑️ 清空对话</button>
+      <div class="bottom-actions">
+        <button
+          v-if="displayMessages.length > 0"
+          class="clear-btn"
+          @click="handleClear"
+          :disabled="isLoading || isAgentBusy"
+        >🗑️ 清空对话</button>
+      </div>
     </div>
 
     <!-- Save dialog -->
@@ -85,30 +114,58 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, watch } from 'vue'
+import { ref, computed, nextTick, watch } from 'vue'
 import { useChat } from '../composables/useChat'
+import { useAgent } from '../composables/useAgent'
 import { useScripts } from '../composables/useScripts'
 import MessageBubble from './MessageBubble.vue'
 
 const emit = defineEmits<{ 'save-script': [] }>()
 
-const { messages, isLoading, streamContent, sendMessage, executeAndRetry, clearMessages, stopGeneration } = useChat()
+const { messages: chatMessages, isLoading, streamContent, sendMessage, executeAndRetry, clearMessages, stopGeneration } = useChat()
+const { agentState, agentSteps, currentStepIndex, messages: agentMessages, isAgentRunning, startAgent, resumeAgent, stopAgent, resetAgent } = useAgent()
 const { addScript } = useScripts()
 
 const inputText = ref('')
 const messagesContainer = ref<HTMLElement | null>(null)
 const execResult = ref<{ success: boolean; result?: string; error?: string } | null>(null)
+const agentMode = ref(false)
+const maxSteps = ref(10)
+
+// Load max steps from settings
+chrome.storage.local.get('settings', (result) => {
+  if (result.settings?.maxAgentSteps) maxSteps.value = result.settings.maxAgentSteps
+})
+
+const isAgentBusy = computed(() => agentState.value === 'running')
+const agentProgressPercent = computed(() => {
+  if (maxSteps.value <= 0) return 0
+  return Math.min(100, ((currentStepIndex.value + 1) / maxSteps.value) * 100)
+})
+
+const displayMessages = computed(() => {
+  return agentMode.value ? agentMessages.value : chatMessages.value
+})
 
 const showSaveDialog = ref(false)
 const pendingSaveCode = ref('')
 const saveForm = ref({ name: '', description: '', urlPattern: '*' })
 
 function send() {
-  if (!inputText.value.trim() || isLoading.value) return
-  const text = inputText.value
+  const text = inputText.value.trim()
+  if (!text) return
+  if (agentMode.value && isAgentBusy.value) return
+  if (!agentMode.value && isLoading.value) return
+
   inputText.value = ''
   execResult.value = null
-  sendMessage(text)
+
+  if (agentMode.value) {
+    resetAgent()
+    startAgent(text)
+  } else {
+    sendMessage(text)
+  }
 }
 
 async function handleExecute(code: string) {
@@ -116,6 +173,23 @@ async function handleExecute(code: string) {
   const result = await executeAndRetry(code)
   execResult.value = result
   scrollToBottom()
+}
+
+function handleStopAgent() {
+  stopAgent()
+}
+
+function handleResumeAgent() {
+  resumeAgent()
+}
+
+function handleClear() {
+  if (agentMode.value) {
+    resetAgent()
+  } else {
+    clearMessages()
+  }
+  execResult.value = null
 }
 
 async function getCurrentTabUrl(): Promise<string> {
@@ -163,7 +237,7 @@ function scrollToBottom() {
   })
 }
 
-watch([messages, streamContent], scrollToBottom, { deep: true })
+watch([displayMessages, streamContent], scrollToBottom, { deep: true })
 </script>
 
 <style scoped>
@@ -422,5 +496,87 @@ watch([messages, streamContent], scrollToBottom, { deep: true })
 
 .save-btn-confirm:hover {
   background: #5b4bd5;
+}
+
+/* Mode Toggle */
+.mode-toggle {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.mode-btn {
+  flex: 1;
+  padding: 4px 8px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: white;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: #666;
+}
+
+.mode-btn.active {
+  background: #6c5ce7;
+  color: white;
+  border-color: #6c5ce7;
+}
+
+.mode-btn:hover:not(.active) {
+  border-color: #6c5ce7;
+  color: #6c5ce7;
+}
+
+.bottom-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.resume-btn {
+  padding: 8px 16px;
+  background: #00b894;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  transition: background 0.2s;
+  align-self: flex-end;
+  cursor: pointer;
+}
+
+.resume-btn:hover {
+  background: #00a381;
+}
+
+/* Agent Progress */
+.agent-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  margin: 8px 0;
+}
+
+.agent-progress-bar {
+  flex: 1;
+  height: 4px;
+  background: #e0e0e0;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.agent-progress-fill {
+  height: 100%;
+  background: #6c5ce7;
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.agent-progress-text {
+  font-size: 11px;
+  color: #999;
+  white-space: nowrap;
 }
 </style>

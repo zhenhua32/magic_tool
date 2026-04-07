@@ -65,6 +65,11 @@ function formatTime(ts: number): string {
   margin-right: auto;
 }
 
+.message-bubble.system {
+  margin: 4px auto;
+  max-width: 100%;
+}
+
 .bubble-content {
   padding: 10px 14px;
   border-radius: 12px;
@@ -83,6 +88,15 @@ function formatTime(ts: number): string {
   color: #1a1a1a;
   border: 1px solid #e0e0e0;
   border-bottom-left-radius: 4px;
+}
+
+.system .bubble-content {
+  background: #f8f9fa;
+  color: #666;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  font-size: 12px;
+  padding: 6px 10px;
 }
 
 .bubble-content :deep(code) {

@@ -52,6 +52,33 @@
         />
       </div>
 
+      <div class="section-title">🤖 Agent 模式</div>
+
+      <div class="field">
+        <label>最大步骤数</label>
+        <input
+          v-model.number="settings.maxAgentSteps"
+          type="number"
+          min="1"
+          max="50"
+          placeholder="10"
+          @change="save"
+        />
+      </div>
+
+      <div class="field">
+        <label>执行后等待时间（毫秒）</label>
+        <input
+          v-model.number="settings.waitAfterExecution"
+          type="number"
+          min="200"
+          max="10000"
+          step="100"
+          placeholder="1500"
+          @change="save"
+        />
+      </div>
+
       <div class="test-section">
         <button
           class="test-btn"
@@ -83,6 +110,7 @@
       <div class="hint">
         <p>💡 视觉模型会额外发送当前页面截图，有助于识别元素位置。</p>
         <p>💡 API Key 仅保存在本地，不会同步到其他设备。</p>
+        <p>💡 Agent 模式下 AI 会自动执行并迭代，直到任务完成或达到最大步骤数。</p>
       </div>
     </template>
   </div>
@@ -151,6 +179,15 @@ async function testConnection() {
 
 .field {
   margin-bottom: 16px;
+}
+
+.section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #6c5ce7;
+  margin: 20px 0 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #e0e0e0;
 }
 
 .field label {
