@@ -113,6 +113,7 @@ export type MessageType =
   | 'AI_CHAT_STREAM_DONE'
   | 'AI_CHAT_STREAM_ERROR'
   | 'WAIT_FOR_STABLE'
+  | 'AI_CHAT_AGENT'
 
 export interface ExtMessage<T = any> {
   type: MessageType

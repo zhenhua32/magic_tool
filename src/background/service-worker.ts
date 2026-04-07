@@ -143,16 +143,20 @@ const messageHandlers: Record<
         sendResponse({ success: false, error: 'No active tab' })
         return
       }
-      const EXEC_TIMEOUT = 30000
+      const EXEC_TIMEOUT = 120000
       const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('代码执行超时（30秒）')), EXEC_TIMEOUT),
+        setTimeout(() => reject(new Error('代码执行超时（120秒）')), EXEC_TIMEOUT),
       )
       const execPromise = chrome.scripting.executeScript({
         target: { tabId: tab.id },
-        func: (code: string) => {
+        func: async (code: string) => {
           try {
             const indirectEval = (0, eval)
-            const result = indirectEval(code)
+            let result = indirectEval(code)
+            // Await if the result is a Promise (async code)
+            if (result && typeof result === 'object' && typeof result.then === 'function') {
+              result = await result
+            }
             return { success: true, result: String(result ?? 'done') }
           } catch (e: any) {
             return { success: false, error: e.message }
