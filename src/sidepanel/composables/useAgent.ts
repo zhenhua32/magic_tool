@@ -4,6 +4,8 @@ import { generateId } from '@/shared/storage'
 import { getContextBudgets } from '@/background/prompt-builder'
 
 const MAX_CONSECUTIVE_FAILURES = 3
+const MAX_COMPLETION_SIGNALS = 2
+const COMPLETION_PATTERNS = /(?:任务完成|全部完成|已完成|完成了|成功完成|下载完成|操作完成|总任务完成|all\s*done|completed?|finished)/i
 
 export function useAgent() {
   const agentState = ref<AgentState>('idle')
@@ -12,6 +14,7 @@ export function useAgent() {
   const agentTask = ref('')
   const messages = ref<ChatMessage[]>([])
   const consecutiveFailures = ref(0)
+  const completionSignalCount = ref(0)
   const targetTabId = ref<number | null>(null)
 
   const isAgentRunning = computed(() => agentState.value === 'running')
@@ -60,6 +63,12 @@ export function useAgent() {
     })
     if (res?.success) return res.data
     throw new Error(res?.error ?? '未知错误')
+  }
+
+  // ---- Completion signal detection ----
+
+  function looksLikeCompletion(text: string): boolean {
+    return COMPLETION_PATTERNS.test(text)
   }
 
   // ---- JSON parsing ----
@@ -212,6 +221,7 @@ export function useAgent() {
     agentSteps.value = []
     currentStepIndex.value = 0
     consecutiveFailures.value = 0
+    completionSignalCount.value = 0
     messages.value = []
 
     const maxSteps = settings?.maxAgentSteps ?? 10
@@ -237,9 +247,14 @@ export function useAgent() {
         // 2. Build context and call AI
         addMessage('system', `🧠 步骤 ${stepIdx + 1}: 正在分析...`)
         const history = buildCompactHistory(agentSteps.value, settings)
-        const taskText = stepIdx === 0
-          ? task
-          : `继续执行任务: ${task}`
+        let taskText: string
+        if (stepIdx === 0) {
+          taskText = task
+        } else if (completionSignalCount.value > 0) {
+          taskText = `上一步执行结果表明任务可能已完成。请确认任务是否已完成，如果已完成请设置 done: true 并给出总结。原始任务: ${task}`
+        } else {
+          taskText = `继续执行任务: ${task}`
+        }
 
         let aiReply: string
         try {
@@ -311,9 +326,24 @@ export function useAgent() {
         if (execResult.success) {
           addMessage('system', `✅ 步骤 ${stepIdx + 1} 执行成功: ${execResult.result ?? 'done'}`)
           consecutiveFailures.value = 0
+
+          // Detect completion signals in execution result
+          if (looksLikeCompletion(execResult.result ?? '')) {
+            completionSignalCount.value++
+            if (completionSignalCount.value >= MAX_COMPLETION_SIGNALS) {
+              step.executionResult = execResult
+              agentSteps.value = [...agentSteps.value, step]
+              addMessage('system', `✅ 执行结果连续 ${MAX_COMPLETION_SIGNALS} 次表明任务已完成，Agent 自动停止`)
+              agentState.value = 'completed'
+              break
+            }
+          } else {
+            completionSignalCount.value = 0
+          }
         } else {
           addMessage('system', `❌ 步骤 ${stepIdx + 1} 执行失败: ${execResult.error}`)
           consecutiveFailures.value++
+          completionSignalCount.value = 0
           if (consecutiveFailures.value >= MAX_CONSECUTIVE_FAILURES) {
             agentSteps.value = [...agentSteps.value, step]
             addMessage('system', `⚠️ 连续失败 ${MAX_CONSECUTIVE_FAILURES} 次，Agent 已暂停。你可以继续或停止。`)
@@ -380,9 +410,13 @@ export function useAgent() {
         addMessage('system', `🧠 步骤 ${stepIdx + 1}: 正在分析...`)
         const history = buildCompactHistory(agentSteps.value, settings)
 
+        const taskText = completionSignalCount.value > 0
+          ? `上一步执行结果表明任务可能已完成。请确认任务是否已完成，如果已完成请设置 done: true 并给出总结。原始任务: ${agentTask.value}`
+          : `继续执行任务: ${agentTask.value}`
+
         let aiReply: string
         try {
-          aiReply = await callAgentAI(`继续执行任务: ${agentTask.value}`, html, screenshot, history)
+          aiReply = await callAgentAI(taskText, html, screenshot, history)
         } catch (e: any) {
           addMessage('system', `❌ AI 调用失败: ${e.message}`)
           agentState.value = 'failed'
@@ -443,9 +477,24 @@ export function useAgent() {
         if (execResult.success) {
           addMessage('system', `✅ 步骤 ${stepIdx + 1} 执行成功: ${execResult.result ?? 'done'}`)
           consecutiveFailures.value = 0
+
+          // Detect completion signals in execution result
+          if (looksLikeCompletion(execResult.result ?? '')) {
+            completionSignalCount.value++
+            if (completionSignalCount.value >= MAX_COMPLETION_SIGNALS) {
+              step.executionResult = execResult
+              agentSteps.value = [...agentSteps.value, step]
+              addMessage('system', `✅ 执行结果连续 ${MAX_COMPLETION_SIGNALS} 次表明任务已完成，Agent 自动停止`)
+              agentState.value = 'completed'
+              break
+            }
+          } else {
+            completionSignalCount.value = 0
+          }
         } else {
           addMessage('system', `❌ 步骤 ${stepIdx + 1} 执行失败: ${execResult.error}`)
           consecutiveFailures.value++
+          completionSignalCount.value = 0
           if (consecutiveFailures.value >= MAX_CONSECUTIVE_FAILURES) {
             agentSteps.value = [...agentSteps.value, step]
             agentState.value = 'paused'
@@ -489,6 +538,7 @@ export function useAgent() {
     agentSteps.value = []
     currentStepIndex.value = 0
     consecutiveFailures.value = 0
+    completionSignalCount.value = 0
     agentTask.value = ''
     targetTabId.value = null
     messages.value = []
