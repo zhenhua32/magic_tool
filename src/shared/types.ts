@@ -6,6 +6,7 @@ export interface Settings {
   modelName: string
   systemPrompt: string
   requestTimeout: number
+  contextLength: number
   maxAgentSteps: number
   waitAfterExecution: number
 }
@@ -74,6 +75,7 @@ export const DEFAULT_SETTINGS: Settings = {
   modelName: 'gpt-4o',
   systemPrompt: DEFAULT_SYSTEM_PROMPT,
   requestTimeout: 300,
+  contextLength: 128000,
   maxAgentSteps: 10,
   waitAfterExecution: 1500,
 }

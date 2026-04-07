@@ -1,6 +1,7 @@
 import { ref } from 'vue'
-import type { ChatMessage } from '@/shared/types'
+import type { ChatMessage, Settings } from '@/shared/types'
 import { generateId } from '@/shared/storage'
+import { getContextBudgets } from '@/background/prompt-builder'
 
 const MAX_RETRIES = 2
 
@@ -23,9 +24,9 @@ export function useChat() {
     return msg
   }
 
-  async function getPageHTML(): Promise<string> {
+  async function getPageHTML(maxHtmlLength?: number): Promise<string> {
     return new Promise((resolve) => {
-      chrome.runtime.sendMessage({ type: 'GET_HTML' }, (res) => {
+      chrome.runtime.sendMessage({ type: 'GET_HTML', data: { maxHtmlLength } }, (res) => {
         resolve(res?.success ? res.data : '<p>无法获取页面内容</p>')
       })
     })
@@ -85,9 +86,10 @@ export function useChat() {
     // Re-fetch HTML and ask AI to fix
     isLoading.value = true
     try {
-      const freshHtml = await getPageHTML()
       const settingsResult = await chrome.storage.local.get('settings')
-      const settings = settingsResult.settings
+      const settings: Settings = settingsResult.settings
+      const { maxHtmlLength } = getContextBudgets(settings)
+      const freshHtml = await getPageHTML(maxHtmlLength)
       let screenshot: string | undefined
       if (settings?.modelType === 'vision') {
         screenshot = await captureScreenshot()
@@ -195,11 +197,11 @@ export function useChat() {
     retryCount.value = 0
 
     try {
-      const html = await getPageHTML()
-
       // Check settings for vision model
       const settingsResult = await chrome.storage.local.get('settings')
-      const settings = settingsResult.settings
+      const settings: Settings = settingsResult.settings
+      const { maxHtmlLength } = getContextBudgets(settings)
+      const html = await getPageHTML(maxHtmlLength)
       let screenshot: string | undefined
       if (settings?.modelType === 'vision') {
         screenshot = await captureScreenshot()

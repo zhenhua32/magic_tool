@@ -1,6 +1,7 @@
 import { ref, computed } from 'vue'
 import type { AgentState, AgentStep, AgentAction, ChatMessage, Settings } from '@/shared/types'
 import { generateId } from '@/shared/storage'
+import { getContextBudgets } from '@/background/prompt-builder'
 
 const MAX_CONSECUTIVE_FAILURES = 3
 
@@ -29,8 +30,8 @@ export function useAgent() {
     return tab.id
   }
 
-  async function getPageHTML(): Promise<string> {
-    const res = await sendChromeMessage({ type: 'GET_HTML', data: { tabId: targetTabId.value } })
+  async function getPageHTML(maxHtmlLength?: number): Promise<string> {
+    const res = await sendChromeMessage({ type: 'GET_HTML', data: { tabId: targetTabId.value, maxHtmlLength } })
     return res?.success ? res.data : '<p>无法获取页面内容</p>'
   }
 
@@ -215,6 +216,7 @@ export function useAgent() {
 
     const maxSteps = settings?.maxAgentSteps ?? 10
     const waitTime = settings?.waitAfterExecution ?? 1500
+    const { maxHtmlLength } = getContextBudgets(settings)
 
     addMessage('user', `🤖 Agent 任务: ${task}`)
 
@@ -224,7 +226,7 @@ export function useAgent() {
 
         // 1. Collect page state
         addMessage('system', `⏳ 步骤 ${stepIdx + 1}: 正在采集页面状态...`)
-        const html = await getPageHTML()
+        const html = await getPageHTML(maxHtmlLength)
         let screenshot: string | undefined
         if (settings?.modelType === 'vision') {
           screenshot = await captureScreenshot()
@@ -357,6 +359,7 @@ export function useAgent() {
     const settingsResult = await chrome.storage.local.get('settings')
     const settings: Settings = settingsResult.settings
     const maxSteps = (settings?.maxAgentSteps ?? 10) + currentStepIndex.value
+    const { maxHtmlLength } = getContextBudgets(settings)
 
     agentState.value = 'running'
     consecutiveFailures.value = 0
@@ -366,7 +369,7 @@ export function useAgent() {
     try {
       while (agentState.value === 'running' && currentStepIndex.value < maxSteps) {
         const stepIdx = currentStepIndex.value
-        const html = await getPageHTML()
+        const html = await getPageHTML(maxHtmlLength)
         let screenshot: string | undefined
         if (settings?.modelType === 'vision') {
           screenshot = await captureScreenshot()

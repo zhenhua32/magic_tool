@@ -1,7 +1,21 @@
 import type { Settings, ChatMessage } from '@/shared/types'
 import { DEFAULT_SYSTEM_PROMPT } from '@/shared/types'
 
-const MAX_HISTORY_MESSAGES = 20
+// Estimate ~4 chars per token. Reserve tokens for system prompt and response.
+const SYSTEM_PROMPT_RESERVE = 3000  // tokens for system prompt
+const RESPONSE_RESERVE = 4000      // tokens for model response
+const HISTORY_RATIO = 0.3          // 30% of remaining budget for history, 70% for HTML
+
+export function getContextBudgets(settings: Settings) {
+  const contextLength = settings.contextLength || 128000
+  const available = contextLength - SYSTEM_PROMPT_RESERVE - RESPONSE_RESERVE
+  const historyTokens = Math.floor(available * HISTORY_RATIO)
+  const htmlTokens = available - historyTokens
+  return {
+    maxHtmlLength: Math.max(10000, htmlTokens * 4),        // chars
+    maxHistoryMessages: Math.max(4, Math.floor(historyTokens / 500)),  // ~500 tokens per message
+  }
+}
 
 export function buildMessages(
   settings: Settings,
@@ -18,8 +32,9 @@ export function buildMessages(
   // Append conversation history (excluding the current user message which is the last one)
   if (history && history.length > 0) {
     // Keep only recent messages to stay within token budget
-    const trimmed = history.length > MAX_HISTORY_MESSAGES
-      ? history.slice(-MAX_HISTORY_MESSAGES)
+    const { maxHistoryMessages } = getContextBudgets(settings)
+    const trimmed = history.length > maxHistoryMessages
+      ? history.slice(-maxHistoryMessages)
       : history
     for (const msg of trimmed) {
       // Skip the last user message — it will be added below with HTML context
@@ -116,8 +131,9 @@ export function buildAgentMessages(
   ]
 
   if (history && history.length > 0) {
-    const trimmed = history.length > MAX_HISTORY_MESSAGES
-      ? history.slice(-MAX_HISTORY_MESSAGES)
+    const { maxHistoryMessages } = getContextBudgets(settings)
+    const trimmed = history.length > maxHistoryMessages
+      ? history.slice(-maxHistoryMessages)
       : history
     messages.push(...trimmed)
   }

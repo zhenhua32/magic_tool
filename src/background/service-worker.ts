@@ -68,10 +68,11 @@ const messageHandlers: Record<
         sendResponse({ success: false, error: 'No active tab' })
         return
       }
+      const maxHtmlLength = (msg.data?.maxHtmlLength as number) || 50000
       const results = await chrome.scripting.executeScript({
         target: { tabId: tabId },
-        func: () => {
-          const MAX_HTML_LENGTH = 50000
+        func: (maxLen: number) => {
+          const MAX_HTML_LENGTH = maxLen
           const MAX_DEPTH = 10
           const SKIP_TAGS = new Set([
             'SCRIPT', 'STYLE', 'NOSCRIPT', 'SVG', 'LINK', 'META',
@@ -132,6 +133,7 @@ const messageHandlers: Record<
           }
           return html
         },
+        args: [maxHtmlLength],
         world: 'MAIN',
       })
       const html = results[0]?.result ?? ''

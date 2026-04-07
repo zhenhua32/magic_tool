@@ -5,17 +5,17 @@
     "src": "../../../@crx/manifest",
     "isEntry": true
   },
-  "_storage-BWA-W89n.js": {
-    "file": "assets/storage-BWA-W89n.js",
-    "name": "storage"
+  "_prompt-builder-DR7YUygj.js": {
+    "file": "assets/prompt-builder-DR7YUygj.js",
+    "name": "prompt-builder"
   },
   "src/background/service-worker.ts": {
-    "file": "assets/service-worker.ts-D5naGXUx.js",
+    "file": "assets/service-worker.ts-CsWfMrkv.js",
     "name": "service-worker.ts",
     "src": "src/background/service-worker.ts",
     "isEntry": true,
     "imports": [
-      "_storage-BWA-W89n.js"
+      "_prompt-builder-DR7YUygj.js"
     ]
   },
   "src/content/index.ts": {
@@ -25,15 +25,15 @@
     "isEntry": true
   },
   "src/sidepanel/index.html": {
-    "file": "assets/sidepanel-CAbrC2Rs.js",
+    "file": "assets/sidepanel-BNs1a90q.js",
     "name": "sidepanel",
     "src": "src/sidepanel/index.html",
     "isEntry": true,
     "imports": [
-      "_storage-BWA-W89n.js"
+      "_prompt-builder-DR7YUygj.js"
     ],
     "css": [
-      "assets/sidepanel-BrMdNjAl.css"
+      "assets/sidepanel-RWKm5qNT.css"
     ]
   }
 }

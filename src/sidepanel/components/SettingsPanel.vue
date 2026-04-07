@@ -52,6 +52,20 @@
         />
       </div>
 
+      <div class="field">
+        <label>模型上下文长度（tokens）</label>
+        <input
+          v-model.number="settings.contextLength"
+          type="number"
+          min="4000"
+          max="2000000"
+          step="1000"
+          placeholder="128000"
+          @change="save"
+        />
+        <span class="field-hint">影响发送给模型的 HTML 和历史消息量，建议与模型实际支持的上下文长度一致</span>
+      </div>
+
       <div class="section-title">🤖 Agent 模式</div>
 
       <div class="field">
@@ -195,6 +209,13 @@ async function testConnection() {
   font-weight: 600;
   margin-bottom: 4px;
   color: #333;
+}
+
+.field-hint {
+  display: block;
+  font-size: 11px;
+  color: #999;
+  margin-top: 4px;
 }
 
 .field textarea {
