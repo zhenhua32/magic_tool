@@ -11,6 +11,7 @@ export function useAgent() {
   const agentTask = ref('')
   const messages = ref<ChatMessage[]>([])
   const consecutiveFailures = ref(0)
+  const targetTabId = ref<number | null>(null)
 
   const isAgentRunning = computed(() => agentState.value === 'running')
 
@@ -22,22 +23,28 @@ export function useAgent() {
     })
   }
 
+  async function resolveTargetTabId(): Promise<number> {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+    if (!tab?.id) throw new Error('无法获取当前标签页')
+    return tab.id
+  }
+
   async function getPageHTML(): Promise<string> {
-    const res = await sendChromeMessage({ type: 'GET_HTML' })
+    const res = await sendChromeMessage({ type: 'GET_HTML', data: { tabId: targetTabId.value } })
     return res?.success ? res.data : '<p>无法获取页面内容</p>'
   }
 
   async function captureScreenshot(): Promise<string | undefined> {
-    const res = await sendChromeMessage({ type: 'CAPTURE_SCREENSHOT' })
+    const res = await sendChromeMessage({ type: 'CAPTURE_SCREENSHOT', data: { tabId: targetTabId.value } })
     return res?.success ? res.data : undefined
   }
 
   async function executeCode(code: string): Promise<{ success: boolean; result?: string; error?: string }> {
-    return sendChromeMessage({ type: 'EXECUTE_CODE', data: { code } })
+    return sendChromeMessage({ type: 'EXECUTE_CODE', data: { code, tabId: targetTabId.value } })
   }
 
   async function waitForPageStable(timeout: number): Promise<void> {
-    await sendChromeMessage({ type: 'WAIT_FOR_STABLE', data: { timeout } })
+    await sendChromeMessage({ type: 'WAIT_FOR_STABLE', data: { timeout, tabId: targetTabId.value } })
   }
 
   async function callAgentAI(
@@ -195,6 +202,9 @@ export function useAgent() {
   async function startAgent(task: string) {
     const settingsResult = await chrome.storage.local.get('settings')
     const settings: Settings = settingsResult.settings
+
+    // Lock target tab at the moment agent starts
+    targetTabId.value = await resolveTargetTabId()
 
     agentState.value = 'running'
     agentTask.value = task
@@ -477,6 +487,7 @@ export function useAgent() {
     currentStepIndex.value = 0
     consecutiveFailures.value = 0
     agentTask.value = ''
+    targetTabId.value = null
     messages.value = []
   }
 

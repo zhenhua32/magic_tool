@@ -10,7 +10,7 @@
     "name": "storage"
   },
   "src/background/service-worker.ts": {
-    "file": "assets/service-worker.ts-6agQoomk.js",
+    "file": "assets/service-worker.ts-D5naGXUx.js",
     "name": "service-worker.ts",
     "src": "src/background/service-worker.ts",
     "isEntry": true,
@@ -25,7 +25,7 @@
     "isEntry": true
   },
   "src/sidepanel/index.html": {
-    "file": "assets/sidepanel-CrSzOcsi.js",
+    "file": "assets/sidepanel-CAbrC2Rs.js",
     "name": "sidepanel",
     "src": "src/sidepanel/index.html",
     "isEntry": true,

@@ -30,12 +30,16 @@ const messageHandlers: Record<
   string,
   (msg: ExtMessage, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) => void
 > = {
-  CAPTURE_SCREENSHOT: async (_msg, _sender, sendResponse) => {
+  CAPTURE_SCREENSHOT: async (msg, _sender, sendResponse) => {
     try {
-      const [tab] = await chrome.tabs.query({
-        active: true,
-        currentWindow: true,
-      })
+      const pinnedTabId = msg.data?.tabId as number | undefined
+      let tab: chrome.tabs.Tab
+      if (pinnedTabId) {
+        tab = await chrome.tabs.get(pinnedTabId)
+      } else {
+        const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true })
+        tab = activeTab
+      }
       if (!tab?.id) {
         sendResponse({ success: false, error: 'No active tab' })
         return
@@ -50,18 +54,22 @@ const messageHandlers: Record<
     }
   },
 
-  GET_HTML: async (_msg, _sender, sendResponse) => {
+  GET_HTML: async (msg, _sender, sendResponse) => {
     try {
-      const [tab] = await chrome.tabs.query({
-        active: true,
-        currentWindow: true,
-      })
-      if (!tab?.id) {
+      const pinnedTabId = msg.data?.tabId as number | undefined
+      let tabId: number | undefined
+      if (pinnedTabId) {
+        tabId = pinnedTabId
+      } else {
+        const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true })
+        tabId = activeTab?.id
+      }
+      if (!tabId) {
         sendResponse({ success: false, error: 'No active tab' })
         return
       }
       const results = await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
+        target: { tabId: tabId },
         func: () => {
           const MAX_HTML_LENGTH = 50000
           const MAX_DEPTH = 10
@@ -135,11 +143,15 @@ const messageHandlers: Record<
 
   EXECUTE_CODE: async (msg, _sender, sendResponse) => {
     try {
-      const [tab] = await chrome.tabs.query({
-        active: true,
-        currentWindow: true,
-      })
-      if (!tab?.id) {
+      const pinnedTabId = msg.data?.tabId as number | undefined
+      let tabId: number | undefined
+      if (pinnedTabId) {
+        tabId = pinnedTabId
+      } else {
+        const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true })
+        tabId = activeTab?.id
+      }
+      if (!tabId) {
         sendResponse({ success: false, error: 'No active tab' })
         return
       }
@@ -148,7 +160,7 @@ const messageHandlers: Record<
         setTimeout(() => reject(new Error('代码执行超时（120秒）')), EXEC_TIMEOUT),
       )
       const execPromise = chrome.scripting.executeScript({
-        target: { tabId: tab.id },
+        target: { tabId: tabId },
         func: async (code: string) => {
           try {
             const indirectEval = (0, eval)
@@ -247,14 +259,21 @@ const messageHandlers: Record<
 
   WAIT_FOR_STABLE: async (msg, _sender, sendResponse) => {
     try {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
-      if (!tab?.id) {
+      const pinnedTabId = msg.data?.tabId as number | undefined
+      let tabId: number | undefined
+      if (pinnedTabId) {
+        tabId = pinnedTabId
+      } else {
+        const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true })
+        tabId = activeTab?.id
+      }
+      if (!tabId) {
         sendResponse({ success: false, error: 'No active tab' })
         return
       }
       const timeout = msg.data?.timeout ?? 1500
       const results = await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
+        target: { tabId: tabId },
         func: (timeoutMs: number) => {
           return new Promise<boolean>((resolve) => {
             let timer: ReturnType<typeof setTimeout>
